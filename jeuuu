@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Traffic Rider Web - Pédales</title>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.10.12/brython.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.10.12/brython_stdlib.js"></script>
+    <style>
+        body { margin:0; overflow:hidden; background:green; }
+        canvas { display:block; margin:0 auto; background:#333; }
+        #controls {
+            position:absolute;
+            bottom:10px;
+            width:100%;
+            display:flex;
+            justify-content:space-around;
+        }
+        .btn {
+            width:80px;
+            height:80px;
+            background:#555;
+            border-radius:40px;
+            color:white;
+            font-size:18px;
+            text-align:center;
+            line-height:80px;
+            user-select:none;
+        }
+    </style>
+</head>
+<body onload="brython()">
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <div id="controls">
+        <div id="brake" class="btn">Freiner</div>
+        <div id="accelerate" class="btn">Accélérer</div>
+    </div>
+
+    <script type="text/python">
+from browser import document, timer, bind
+import random
+
+canvas = document["gameCanvas"]
+ctx = canvas.getContext("2d")
+
+# ==== Variables du jeu ====
+car_width = 50
+car_height = 100
+car_x = 175
+car_y = 480
+car_colors = ["red","lime","blue","yellow","magenta"]
+car_index = 0
+
+road_left = 100
+road_width = 200
+
+obstacles = []
+spawn_timer = 0
+
+score = 0
+money = 0
+
+# ==== Déplacement voiture ====
+car_speed = 0
+max_speed = 12
+acceleration = 0.5
+
+# ==== Boutons ====
+accelerating = False
+braking = False
+
+def accel_down(ev): global accelerating; accelerating=True
+def accel_up(ev): global accelerating; accelerating=False
+def brake_down(ev): global braking; braking=True
+def brake_up(ev): global braking; braking=False
+
+document["accelerate"].bind("mousedown", accel_down)
+document["accelerate"].bind("mouseup", accel_up)
+document["accelerate"].bind("touchstart", accel_down)
+document["accelerate"].bind("touchend", accel_up)
+
+document["brake"].bind("mousedown", brake_down)
+document["brake"].bind("mouseup", brake_up)
+document["brake"].bind("touchstart", brake_down)
+document["brake"].bind("touchend", brake_up)
+
+# ==== Obstacles ====
+def spawn_obstacle():
+    lane_width = road_width / 3
+    lane = random.randint(0,2)
+    x = road_left + lane*lane_width + (lane_width - car_width)/2
+    y = -car_height
+    color = "blue"
+    obstacles.append({'x':x,'y':y,'w':car_width,'h':car_height,'color':color})
+
+# ==== Update du jeu ====
+def update():
+    global car_x, spawn_timer, score, money, car_index, obstacles, car_speed
+
+    # ==== Vitesse ====
+    if accelerating:
+        car_speed += acceleration
+    if braking:
+        car_speed -= acceleration
+    car_speed = max(2, min(max_speed, car_speed))
+
+    # Déplacement obstacles (simule vitesse)
+    for obs in obstacles:
+        obs['y'] += car_speed
+
+    # Spawn obstacles
+    spawn_timer += 1
+    if spawn_timer > 30:
+        spawn_obstacle()
+        spawn_timer = 0
+
+    # Collision
+    for obs in obstacles:
+        if (car_x < obs['x']+obs['w'] and car_x+car_width > obs['x'] and
+            car_y < obs['y']+obs['h'] and car_y+car_height > obs['y']):
+            print("Collision ! GAME OVER")
+            timer.clear_interval(game_interval)
+
+    # Supprimer obstacles hors écran
+    obstacles[:] = [o for o in obstacles if o['y'] < 600]
+
+    # Score et argent
+    score += int(car_speed)
+    if score % 100 == 0:
+        money += 10
+        if money >= 20 and car_index < len(car_colors)-1:
+            car_index += 1
+            money = 0
+
+    draw()
+
+# ==== Dessin ====
+def draw():
+    ctx.fillStyle = "green"
+    ctx.fillRect(0,0,400,600)
+
+    # Route
+    ctx.fillStyle = "#555"
+    ctx.fillRect(road_left,0,road_width,600)
+
+    # Ligne centrale
+    ctx.strokeStyle = "white"
+    ctx.lineWidth = 4
+    for i in range(0,600,40):
+        ctx.beginPath()
+        ctx.moveTo(200-5,i)
+        ctx.lineTo(200+5,i+20)
+        ctx.stroke()
+
+    # Obstacles
+    for obs in obstacles:
+        ctx.fillStyle = obs['color']
+        ctx.fillRect(obs['x'],obs['y'],obs['w'],obs['h'])
+
+    # Voiture joueur
+    ctx.fillStyle = car_colors[car_index]
+    ctx.fillRect(car_x,car_y,car_width,car_height)
+
+    # Score / argent
+    ctx.fillStyle = "white"
+    ctx.font = "20px Arial"
+    ctx.fillText(f"Score: {score}",10,30)
+    ctx.fillText(f"Money: {money}",10,60)
+
+# ==== Boucle principale ====
+game_interval = timer.set_interval(update, 16)  # ~60fps
+    </script>
+</body>
+</html>
